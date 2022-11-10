@@ -1,12 +1,12 @@
 from wordfreq import zipf_frequency as freq
 import nltk
 from api import get_related, _get_related
-from random import choice
+# from random import choice
 from nltk.tag import pos_tag, map_tag
 from tabulate import tabulate
 from pattern.text.en import sentiment
 import inflect
-from bisect import insort
+# from bisect import insort
 import re
 
 # todo: change input method into a selective interface using inquirer or otherwise
