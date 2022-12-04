@@ -1,3 +1,5 @@
+import string
+
 from wiktionaryparser import WiktionaryParser
 import httpx
 from nltk.corpus import wordnet as wn
@@ -5,9 +7,58 @@ from bs4 import BeautifulSoup
 import re
 import json
 from typing import List
+import pprint
+import string
 
 _parser = WiktionaryParser()
 _PATTERN_PATTERN = re.compile(r"(\([\w\s:]+\): )(.+)")
+
+def pprint_def(word: str) -> str:
+    _def = get_def(word)
+    final = ""
+    temp = '\n'.join([f'{i+1}. {j}' for i, j in enumerate(_def[0]["def"])])
+    final += f"Definitions\n+--- {temp}\n"
+    final += f"Etymology\n+--- {_def[0]['ety']}\n"
+    if len(_def) == 2:
+        key, val = list(_def[1].items())
+        print(key, val, sep = "\n||||\n")
+        final += f"\nSingularized ({key[0]})\n"
+        temp = '\n+--- '.join([f'{i + 1}. {j}' for i, j in enumerate(key[1]["def"])])
+        final += f"Definitions\n+--- {temp}\n"
+        final += f"Etymology\n+--- {val[1]}"
+
+    return final
+
+def get_def(word: str) -> List[str]:
+    parsed = _parser.fetch(word)
+    if parsed[0]["definitions"] == []:
+        return ""
+    _parsed: list = [
+        {
+            "def": parsed[0]["definitions"][0]["text"][1:],
+            "ety": (ety if (ety := parsed[0]["etymology"]) != "" else "Unknown"),
+        }
+    ]
+    print(_parsed)
+    if (ind := (_def := _parsed[0]["def"][0]).find("plural of")) != -1:
+        non_plural = _def[ind + 10 :]
+        if _def[-1] in string.punctuation:
+            non_plural = non_plural[:-1]
+        print(ind, non_plural)
+        _parsed.append(
+            {
+                non_plural: {
+                    "def": (non_plural_parsed := _parser.fetch(non_plural))[0][
+                        "definitions"
+                    ][0]["text"][1:]
+                },
+                "ety": ety
+                if (ety := non_plural_parsed[0]["etymology"]) != ""
+                else "Unknown",
+            }
+        )
+
+    return _parsed
 
 
 def _get_syn(word: str) -> List[str]:
@@ -32,16 +83,22 @@ def _get_syn(word: str) -> List[str]:
 
     return syns, th_exist, adj
 
+
 def get_uses(word, type):
     # thanks rhymezone for not having a complete api
-    return NotImplementedError
+    raise NotImplementedError
     # All
     # ---- Books <font size=2> href +
     # ----       <font size=1>
     # ---- Poetry&Shakespeare
     # -------- Poetry <font size=2> href includes "by {author}"
     # -------- Shakespeare else
-    soup = BeautifulSoup(httpx.get(f"https://www.rhymezone.com/r/rhyme.cgi?Word={word}&typeofrhyme=wke&org1=syl&org2=l&org3=y"), "html.parser")
+    soup = BeautifulSoup(
+        httpx.get(
+            f"https://www.rhymezone.com/r/rhyme.cgi?Word={word}&typeofrhyme=wke&org1=syl&org2=l&org3=y"
+        ),
+        "html.parser",
+    )
     print(soup.prettify())
     uses = ""
     for i in uses:
@@ -55,6 +112,7 @@ def get_uses(word, type):
         pass
     else:
         pass
+
 
 def j(adj_word: str) -> List[str]:
     a = httpx.get(f"https://en.wiktionary.org/wiki/Thesaurus:{adj_word}").content
@@ -72,6 +130,7 @@ def j(adj_word: str) -> List[str]:
         if not i.get("title").__contains__("Thesaurus:")
     ]
     return c
+
 
 def _get_related(word: str, __a):
     flag = False
@@ -118,15 +177,19 @@ def _get_related(word: str, __a):
             [_parsed.append(i) for i in udef]
     return _parsed
 
+
 def get_rhym(word: str, type: str) -> List[str]:
     parsed = json.loads(
         BeautifulSoup(
-            httpx.get(f"https://api.datamuse.com/words?{type}={'+'.join(word.split(' '))}"),
+            httpx.get(
+                f"https://api.datamuse.com/words?{type}={'+'.join(word.split(' '))}"
+            ),
             "html.parser",
         ).text
     )
     for i in parsed:
         yield i["word"]
+
 
 def get_related(word: str) -> List[str]:
     flag = False
@@ -212,5 +275,6 @@ def get_related(word: str) -> List[str]:
 
     return list(set(final))
 
-if __name__ == '__main__':
-    get_uses("flamed", "a")
+
+if __name__ == "__main__":
+    print(pprint_def(input()))

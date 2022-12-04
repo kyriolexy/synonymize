@@ -8,8 +8,9 @@ import os
 from contextlib import redirect_stdout
 import webbrowser as wb
 import string
-from api import get_related, get_rhym
+from api import get_related, get_rhym, pprint_def
 from collections import OrderedDict
+from idlelib.tooltip import OnHoverTooltipBase, Hovertip
 
 REMOVE_PUNCT = str.maketrans(string.punctuation, " " * len(string.punctuation))
 SUBSCRIPT = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
@@ -20,13 +21,12 @@ customtkinter.set_default_color_theme(
     "blue"
 )  # Themes: "blue" (standard), "green", "dark-blue"
 
-
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Synonymizer")
-        self.geometry(f"{1100}x{580}")
+        self.geometry(f"{1440}x{720}")
         self.resizable(width=False, height=False)
 
         # ============ create two frames ============
@@ -156,6 +156,7 @@ class App(customtkinter.CTk):
             variable=self.combo_val,
         )
         self.combobox.grid(row=4, column=2, pady=10, padx=20, sticky="n")
+        self.combo_tooltip = Hovertip(self.combobox, "Definitions")
         self.combobox_adj_val = customtkinter.StringVar(value="adjectives")
         self.combobox_adj = customtkinter.CTkComboBox(
             master=self.frame_right,
@@ -164,12 +165,14 @@ class App(customtkinter.CTk):
             variable=self.combobox_adj_val,
         )
         self.combobox_adj.grid(row=5, column=2, pady=10, padx=20, sticky="n")
+        self.combobox_adj_tooltip = Hovertip(self.combobox_adj, "Definitions")
 
         self.tabview = customtkinter.CTkTabview(master=self.frame_right, width=250)
         self.tabview.add("Uses")
         self.tabview.add("External")
         self.tabview.tab("Uses").grid_columnconfigure(0, weight=1)
         self.tabview.tab("External").grid_columnconfigure(0, weight=1)
+        self.tabview.grid(row=6, column=2, pady=10, padx=20, sticky="n")
 
         self.optionmenu_var = tkinter.StringVar(value="All")
         self.optionmenu = customtkinter.CTkOptionMenu(
@@ -281,6 +284,8 @@ class App(customtkinter.CTk):
         self.textbox.tag_config("changed", foreground="purple")"""
         self.history[f"{choice} {self._sel}"] = self._sel
         self.recolor()
+        del self.combobox_adj_tooltip
+        self.combobox_adj_tooltip = Hovertip(self.combobox_adj, pprint_def(choice), hover_delay=100)
 
     def save_changes(self):
         processed = self.textbox.get("1.0", tkinter.END).replace("\n", " \n")
@@ -373,6 +378,8 @@ class App(customtkinter.CTk):
         # self._sel -> choice; reverse
         self.history[choice] = self._sel
         self.recolor()
+        del self.combo_tooltip
+        self.combo_tooltip = Hovertip(self.combobox, pprint_def(choice), hover_delay=100)
         self._sel = choice + self.subscr
 
     def recolor(self):
@@ -454,7 +461,7 @@ class App(customtkinter.CTk):
 
         self.sel, self._sel = _sel, _sel
         self.subscr = "".join([i for i in _sel if not i.isalpha()])
-        self.combobox.configure(values=get_related(sel))
+        self.combobox.configure(values=(related := get_related(sel)))
         self.combobox_adj.configure(
             values=(adjs := list(get_rhym(sel, "rel_jjb")))
             + list(get_rhym(sel, "rel_jja"))
