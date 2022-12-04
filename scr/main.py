@@ -1,13 +1,15 @@
 import tkinter
 from tkinter import filedialog
 import tkinter.messagebox
+import tkinter.font
 import customtkinter
 import textract
 import os
 from contextlib import redirect_stdout
 import webbrowser as wb
 import string
-from api import get_related
+from api import get_related, get_rhym
+from collections import OrderedDict
 
 REMOVE_PUNCT = str.maketrans(string.punctuation, " " * len(string.punctuation))
 SUBSCRIPT = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
@@ -128,31 +130,69 @@ class App(customtkinter.CTk):
         )
         self.analyze.grid(row=1, column=2, pady=10, padx=20, sticky="n")
 
-        self.replace = customtkinter.CTkButton(
+        self.save = customtkinter.CTkButton(
             master=self.frame_right,
             width=120,
             height=32,
-            text="Replace word",
-            command=self.replace,
+            text="Save changes",
+            command=self.save_changes,
         )
-        self.replace.grid(row=2, column=2, pady=10, padx=20, sticky="n")
+        self.save.grid(row=2, column=2, pady=10, padx=20, sticky="n")
 
-        self.combo_val = customtkinter.StringVar(value="")
+        self.revert = customtkinter.CTkButton(
+            master=self.frame_right,
+            width=120,
+            height=32,
+            text="Revert changes",
+            command=self.revert_changes,
+        )
+        self.revert.grid(row=3, column=2, pady=10, padx=20, sticky="n")
+
+        self.combo_val = customtkinter.StringVar(value="synonyms")
         self.combobox = customtkinter.CTkComboBox(
             master=self.frame_right,
-            values=[""],
+            values=["synonyms"],
             command=self.combobox_event,
             variable=self.combo_val,
         )
-        self.combobox.grid(row=3, column=2, pady=10, padx=20, sticky="n")
+        self.combobox.grid(row=4, column=2, pady=10, padx=20, sticky="n")
+        self.combobox_adj_val = customtkinter.StringVar(value="adjectives")
+        self.combobox_adj = customtkinter.CTkComboBox(
+            master=self.frame_right,
+            values=["adjectives"],
+            command=self.combobox_adj_event,
+            variable=self.combobox_adj_val,
+        )
+        self.combobox_adj.grid(row=5, column=2, pady=10, padx=20, sticky="n")
+
+        self.tabview = customtkinter.CTkTabview(master=self.frame_right, width=250)
+        self.tabview.add("Uses")
+        self.tabview.add("External")
+        self.tabview.tab("Uses").grid_columnconfigure(0, weight=1)
+        self.tabview.tab("External").grid_columnconfigure(0, weight=1)
+
+        self.optionmenu_var = tkinter.StringVar(value="All")
+        self.optionmenu = customtkinter.CTkOptionMenu(
+            self.tabview.tab("Uses"),
+            dynamic_resizing=False,
+            variable=self.optionmenu_var,
+            values=["All", "Books", "Poetry", "Shakespeare"],
+        )
+        self.optionmenu.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.quotes = customtkinter.CTkTextbox(master=self.tabview.tab("Uses"))
+        self.quotes.grid(row=1, column=0, padx=20, pady=(20, 10))
 
         # set default values
         # self.button_import(start=True)
         self._start_ran = False
         self.sidebar_button_1 = customtkinter.CTkButton(
-            self.sidebar_frame, text="Import", command=self.button_import()
+            self.sidebar_frame, text="Import", command=self.button_import
         )
+        self.button_import()
+        self._start_ran = True
         self.sidebar_button_1.grid(row=1, column=0, padx=20, pady=10)
+        self.history = OrderedDict()
 
     def button_import(self):
         start = self._start_ran
@@ -165,7 +205,7 @@ class App(customtkinter.CTk):
             ("All files", "*.*"),
         )
 
-        if start is None:
+        if start:
             with redirect_stdout(os.devnull):
                 filename = filedialog.askopenfilename(
                     title="Open a supported Text File",
@@ -180,7 +220,7 @@ class App(customtkinter.CTk):
                 return False
         else:
             with open("defaultvalues.txt", "r") as _f:
-                processed = _f.read()
+                processed = str(_f.read())
         # self.textbox.delete("1.0", tkinter.END)
         processed = processed.replace("\n", " \n")
         _processed = ""
@@ -189,7 +229,7 @@ class App(customtkinter.CTk):
             punct = i[-1] if i[-1] in string.punctuation else ""
             p_bool = punct == ""
             _processed += (
-                f" {i if p_bool else i[:-1]}{str(c).translate(SUBSCRIPT)}{punct}"
+                f"{i if p_bool else i[:-1]}{str(c).translate(SUBSCRIPT)}{punct} "
             )
             # print(f"{c=}: {repr(_processed)=}")
             c += 1
@@ -198,11 +238,7 @@ class App(customtkinter.CTk):
         self._start_ran = True
         return True
 
-    def button_event(self):
-        print("Button pressed")
-
     def export(self):
-        text = self.textbox.get("1.0", tkinter.END)
         with redirect_stdout(os.devnull):
             filename = tkinter.filedialog.asksaveasfilename(
                 title="Save to folder",
@@ -214,7 +250,71 @@ class App(customtkinter.CTk):
             with open(filename, "w") as f:
                 f.write(self.textbox.get("1.0", tkinter.END))
 
+    def optionbox_event(self, choice):
+        raise NotImplementedError
+
+    def combobox_adj_event(self, choice):
+        r_ind = int(
+            self.textbox.get("1.0", tkinter.END)
+            .translate(R_SUBSCRIPT)
+            .find(self._sel.translate(R_SUBSCRIPT) + " ")
+        )
+        text = self.textbox.get("1.0", tkinter.END)
+        self.textbox.destroy()
+        self.textbox = customtkinter.CTkTextbox(master=self.frame_info)
+        self.textbox.grid(
+            row=1, column=0, rowspan=9, columnspan=2, pady=5, padx=5, sticky="nsew"
+        )
+        # outermost extremity -> upper extremity
+        _r_ind = 0
+        if text[r_ind - 2] not in "₀₁₂₃₄₅₆₇₈₉":
+            while True:
+                _r_ind += 1
+                print(text[r_ind - _r_ind - 1], _r_ind, sep="|")
+                if text[r_ind - _r_ind - 1] == " ":
+                    break
+        _text = text[: r_ind - _r_ind] + choice + text[r_ind - 1 :]
+        self.textbox.insert("1.0", _text)
+        """self.textbox.tag_add(
+            "changed", str(float(r_ind)), str(float(r_ind + len(choice)))
+        )
+        self.textbox.tag_config("changed", foreground="purple")"""
+        self.history[f"{choice} {self._sel}"] = self._sel
+        self.recolor()
+
+    def save_changes(self):
+        processed = self.textbox.get("1.0", tkinter.END).replace("\n", " \n")
+        _processed = ""
+        c = 0
+        for i in processed.split(" "):
+            punct = i[-1] if i[-1] in string.punctuation else ""
+            p_bool = punct == ""
+            _processed += (
+                f"{i if p_bool else i[:-1]}{str(c).translate(SUBSCRIPT)}{punct} "
+            )
+            c += 1
+        self.textbox.destroy()
+        self.textbox = customtkinter.CTkTextbox(master=self.frame_info)
+        self.textbox.grid(
+            row=1, column=0, rowspan=9, columnspan=2, pady=5, padx=5, sticky="nsew"
+        )
+        self.textbox.insert("1.0", _processed)
+        self._start_ran = True
+
+    def revert_changes(self):
+        _history = OrderedDict(reversed(list(self.history.items())))
+        text = self.textbox.get("1.0", tkinter.END)
+        for act, rev in _history.items():
+            text.replace(act, rev)
+        self.textbox.destroy()
+        self.textbox = customtkinter.CTkTextbox(master=self.frame_info)
+        self.textbox.grid(
+            row=1, column=0, rowspan=9, columnspan=2, pady=5, padx=5, sticky="nsew"
+        )
+        self.textbox.insert("1.0", text)
+
     def replace(self):
+        raise DeprecationWarning
         choice = self.combobox.get()
         r_ind = int(
             self.textbox.get("1.0", tkinter.END)
@@ -227,7 +327,7 @@ class App(customtkinter.CTk):
         self.textbox.grid(
             row=1, column=0, rowspan=9, columnspan=2, pady=5, padx=5, sticky="nsew"
         )
-        _text = text[:r_ind] + choice + text[r_ind + len(self.sel) - 1 :]
+        _text = text[:r_ind] + choice + text[r_ind + len(self._sel) - 1 :]
         self.textbox.insert("1.0", _text)
 
         self.sel, self._sel = choice + self.subscr, choice + self.subscr
@@ -237,6 +337,7 @@ class App(customtkinter.CTk):
         this shit is stupid
         fuck you you tkinter bastards
         """
+        print(f"{self.sel=}, {self._sel=}")
         # r_ind = (
         #     a
         #     if (a := self.textbox.get("1.0", tkinter.END).rfind(self.sel + " ")) == -1
@@ -251,16 +352,86 @@ class App(customtkinter.CTk):
         self.textbox.grid(
             row=1, column=0, rowspan=9, columnspan=2, pady=5, padx=5, sticky="nsew"
         )
-        a = text[r_ind + len(self.sel) - 1 :]
-        _text = text[:r_ind] + choice + text[r_ind + len(self._sel) - 1 :]
+        _text = text[:r_ind] + choice + self.subscr + text[r_ind + len(self._sel) :]
         self.textbox.insert("1.0", _text)
+        """for i, j in enumerate(text.splitlines(keepends=False)):
+            print(i, j.translate(R_SUBSCRIPT), self._sel.translate(R_SUBSCRIPT) + " ", sep="|")
+            if (
+                ind1 := j.translate(R_SUBSCRIPT).find(
+                    self._sel.translate(R_SUBSCRIPT) + " "
+                )
+            ) != -1:
+                ind2 = ind1 + len(choice)
+                ind1, ind2 = f"{i+1}.{ind1}", f"{i+1}.{ind2}"
+                print(i, j, ind1, ind2, sep=" | ")
+                break
+        else:
+            ind1, ind2 = -1, -1
 
+        self.textbox.tag_add("changed", ind1, ind2)
+        self.textbox.tag_config("changed", foreground="orange")"""
+        # self._sel -> choice; reverse
+        self.history[choice] = self._sel
+        self.recolor()
         self._sel = choice + self.subscr
+
+    def recolor(self):
+        """
+        FUCK YOU
+        """
+        # avian [orange] -> bird
+        # X extremity [orange] -> extreme X
+        #                    (syn)  ^ if value is in keys, pop
+        # X periphery [orange] -> extremity X
+        #                 (adj) ^ if second word in keys, pop
+        # outermost [purple] periphery [orange] -> periphery
+        # ...
+        # start from the back
+        r_history = OrderedDict(reversed(list(self.history.items())))
+        col_hist = r_history
+        keys = r_history.keys()
+        for key, val in r_history.items():
+            # synonym or adjective?
+            if key.split().__len__() == 1:  # syn
+                if val in keys:
+                    col_hist.pop(key)
+            else:  # adj
+                if val in keys:
+                    col_hist.pop(val)
+
+        # only care about keys
+        _keys = col_hist.keys()
+        text = self.textbox.get("1.0", tkinter.END)
+        for i in _keys:
+            if i.split().__len__() == 1:
+                for ind, t in enumerate(text.splitlines(keepends=False)):
+                    if (ind1 := t.find(i)) != -1:
+                        ind1, ind2 = f"{ind+1}.{ind1}", f"{ind+1}.{ind1+len(i)}"
+                        self.textbox.tag_add("changed", ind1, ind2)
+                        self.textbox.tag_config("changed", foreground="orange")
+                        break
+            else:
+                w1, w2 = i.split()[0], i.split()[1]
+                # word1 [purple] word2 [orange]
+                for ind, t in enumerate(text.splitlines(keepends=False)):
+                    if (ind1 := t.find(w1)) != -1:
+                        ind1, ind2 = f"{ind+1}.{ind1}", f"{ind+1}.{ind1+len(w1)}"
+                        self.textbox.tag_add(w1, ind1, ind2)
+                        self.textbox.tag_config(w1, foreground="purple")
+                        ind1, ind2 = (
+                            f"{ind+1}.{int(ind1.split('.')[1])+len(w1)}",
+                            f"{ind+1}.{int(ind1.split('.')[1])+len(w1)+len(w2)}",
+                        )
+                        self.textbox.tag_add(w2, ind1, ind2)
+                        self.textbox.tag_config(w2, foreground="orange")
+                        break
 
     def change_appearance_mode(self, new_appearance_mode):
         customtkinter.set_appearance_mode(new_appearance_mode)
 
     def analyze(self):
+        # todo: fix how it deals with punctuation (replace, combobox events)
+        # punct = i[-1] if i[-1] in string.punctuation else ""
         try:
             _sel = self.textbox.selection_get()
             sel = "".join(
@@ -284,6 +455,11 @@ class App(customtkinter.CTk):
         self.sel, self._sel = _sel, _sel
         self.subscr = "".join([i for i in _sel if not i.isalpha()])
         self.combobox.configure(values=get_related(sel))
+        self.combobox_adj.configure(
+            values=(adjs := list(get_rhym(sel, "rel_jjb")))
+            + list(get_rhym(sel, "rel_jja"))
+        )
+        self.combobox_adj_val.set(value=adjs[0])
         self.combo_val.set(value=sel)
 
     def change_scaling(self, new_scaling: str):

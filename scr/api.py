@@ -3,11 +3,14 @@ import httpx
 from nltk.corpus import wordnet as wn
 from bs4 import BeautifulSoup
 import re
+import json
+from typing import List
 
 _parser = WiktionaryParser()
 _PATTERN_PATTERN = re.compile(r"(\([\w\s:]+\): )(.+)")
 
-def _get_syn(word: str):
+
+def _get_syn(word: str) -> List[str]:
     soup = BeautifulSoup(
         str(httpx.get(f"https://en.wiktionary.org/wiki/{word}").content), "html.parser"
     )
@@ -29,11 +32,34 @@ def _get_syn(word: str):
 
     return syns, th_exist, adj
 
+def get_uses(word, type):
+    # thanks rhymezone for not having a complete api
+    return NotImplementedError
+    # All
+    # ---- Books <font size=2> href +
+    # ----       <font size=1>
+    # ---- Poetry&Shakespeare
+    # -------- Poetry <font size=2> href includes "by {author}"
+    # -------- Shakespeare else
+    soup = BeautifulSoup(httpx.get(f"https://www.rhymezone.com/r/rhyme.cgi?Word={word}&typeofrhyme=wke&org1=syl&org2=l&org3=y"), "html.parser")
+    print(soup.prettify())
+    uses = ""
+    for i in uses:
+        print(i)
 
-def j(adj_word):
+    if type == "All":
+        pass
+    elif type == "Books":
+        pass
+    elif type == "Poetry":
+        pass
+    else:
+        pass
+
+def j(adj_word: str) -> List[str]:
     a = httpx.get(f"https://en.wiktionary.org/wiki/Thesaurus:{adj_word}").content
     soup = BeautifulSoup(a, "html.parser")
-    if len(soup.find_all("div", {"class": "noarticletext mw-content-ltr"}))!=0:
+    if len(soup.find_all("div", {"class": "noarticletext mw-content-ltr"})) != 0:
         return []
     try:
         b = str(soup.find_all("div", {"class": "ul-column-count"})[0])
@@ -65,7 +91,7 @@ def _get_related(word: str, __a):
             if len((a := j(word))) != 0:
                 return a
             b = wn.synsets(word)
-            if len(b)!=0:
+            if len(b) != 0:
                 return [str(lemma.name()) for lemma in b[0].lemmas()]
             else:
                 return []
@@ -92,7 +118,17 @@ def _get_related(word: str, __a):
             [_parsed.append(i) for i in udef]
     return _parsed
 
-def get_related(word: str):
+def get_rhym(word: str, type: str) -> List[str]:
+    parsed = json.loads(
+        BeautifulSoup(
+            httpx.get(f"https://api.datamuse.com/words?{type}={'+'.join(word.split(' '))}"),
+            "html.parser",
+        ).text
+    )
+    for i in parsed:
+        yield i["word"]
+
+def get_related(word: str) -> List[str]:
     flag = False
     final = []
     try:
@@ -136,6 +172,7 @@ def get_related(word: str):
                 adj_word = i[i.index("Thesaurus:") + 10 :]
                 # print(f"adding6 {j(adj_word)=}")
                 final.append(j(adj_word))
+                final.append(get_rhym(adj_word, "ml"))
                 # print(f"adding7 {adj_word=}")
                 final.append(adj_word)
     else:
@@ -166,10 +203,14 @@ def get_related(word: str):
             # print(f"adding12 {_parsed}")
             final.append(_parsed)
 
+    final.append(list(get_rhym(word, "ml")))
     final = [_i for _l in final for _i in _l]
     for i in final:
-        if i[0]=="(":
+        if i[0] == "(":
             final.remove(i)
             [final.append(q) for q in re.findall(_PATTERN_PATTERN, i)[0][1].split(", ")]
 
     return list(set(final))
+
+if __name__ == '__main__':
+    get_uses("flamed", "a")
