@@ -9,6 +9,7 @@ import json
 from typing import List
 import pprint
 import string
+from urllib.parse import quote
 
 _parser = WiktionaryParser()
 _PATTERN_PATTERN = re.compile(r"(\([\w\s:]+\): )(.+)")
@@ -93,6 +94,7 @@ def get_uses(word, type):
     # ---- Poetry&Shakespeare
     # -------- Poetry <font size=2> href includes "by {author}"
     # -------- Shakespeare else
+    # '//api.rhymezone.com/sug?v=' + vocab + '&k=rz_sugj&s=' + encodeURIComponent(request.term); ???
     soup = BeautifulSoup(
         httpx.get(
             f"https://www.rhymezone.com/r/rhyme.cgi?Word={word}&typeofrhyme=wke&org1=syl&org2=l&org3=y"

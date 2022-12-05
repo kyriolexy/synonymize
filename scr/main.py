@@ -4,13 +4,14 @@ import tkinter.messagebox
 import tkinter.font
 import customtkinter
 import textract
+import tkinter.ttk
 import os
 from contextlib import redirect_stdout
 import webbrowser as wb
 import string
 from api import get_related, get_rhym, pprint_def
 from collections import OrderedDict
-from idlelib.tooltip import OnHoverTooltipBase, Hovertip
+from idlelib.tooltip import Hovertip
 
 REMOVE_PUNCT = str.maketrans(string.punctuation, " " * len(string.punctuation))
 SUBSCRIPT = str.maketrans("0123456789", "₀₁₂₃₄₅₆₇₈₉")
@@ -170,8 +171,10 @@ class App(customtkinter.CTk):
         self.tabview = customtkinter.CTkTabview(master=self.frame_right, width=250)
         self.tabview.add("Uses")
         self.tabview.add("External")
+        self.tabview.add("Poetry")
         self.tabview.tab("Uses").grid_columnconfigure(0, weight=1)
         self.tabview.tab("External").grid_columnconfigure(0, weight=1)
+        self.tabview.tab("Poetry").grid_columnconfigure(0, weight=1)
         self.tabview.grid(row=6, column=2, pady=10, padx=20, sticky="n")
 
         self.optionmenu_var = tkinter.StringVar(value="All")
@@ -186,6 +189,14 @@ class App(customtkinter.CTk):
         self.quotes = customtkinter.CTkTextbox(master=self.tabview.tab("Uses"))
         self.quotes.grid(row=1, column=0, padx=20, pady=(20, 10))
 
+        self.rhyme_table = tkinter.ttk.Treeview(self.tabview.tab("Poetry"), columns=("Word", "Syllables"), show="headings")
+        self.rhyme_table.grid(row=0, column=0, padx=20, pady=(20, 10))
+        self.rhyme_table.heading("Word", text="Word")
+        self.rhyme_table.heading("Syllables", text="Syllables")
+        self.rhyme_scrollbar = tkinter.ttk.Scrollbar(self.tabview.tab("Poetry"), orient=tkinter.VERTICAL, command=self.rhyme_table.yview)
+        self.rhyme_table.configure(yscroll=self.rhyme_scrollbar.set)
+        self.rhyme_scrollbar.grid(row=0, column=1, sticky='ns')
+
         # set default values
         # self.button_import(start=True)
         self._start_ran = False
@@ -196,6 +207,23 @@ class App(customtkinter.CTk):
         self._start_ran = True
         self.sidebar_button_1.grid(row=1, column=0, padx=20, pady=10)
         self.history = OrderedDict()
+
+        self.sel, self._sel = "example", "example"
+        self.wiktionary_button = customtkinter.CTkButton(self.tabview.tab("External"),
+                                                         command=lambda: wb.open(f"https://en.wiktionary.org/wiki/{self.sel[:-1]}"), text="Wiktionary")
+        self.wiktionary_button.grid(row=0, column=0, padx=20, pady=(20, 10))
+
+        self.wiki_button = customtkinter.CTkButton(self.tabview.tab("External"),
+                                                         command=lambda: wb.open(f"https://en.wikipedia.org/wiki/{self.sel[:-1]}"), text="Wikipedia")
+        self.wiki_button.grid(row=1, column=0, padx=20, pady=(20, 10))
+
+        self.rhymezone_button = customtkinter.CTkButton(self.tabview.tab("External"),
+                                                         command=lambda: wb.open(f"https://www.rhymezone.com/r/rhyme.cgi?typeofrhyme=wke&loc=defwk&Word={self.sel[:-1]}"), text="Rhymezone Uses")
+        self.rhymezone_button.grid(row=2, column=0, padx=20, pady=(20, 10))
+
+        self.onelook_button = customtkinter.CTkButton(self.tabview.tab("External"),
+                                                        command=lambda: wb.open(f"https://www.onelook.com/?w={self.sel[:-1]}&ls=a"), text="OneLook Dictionary")
+        self.onelook_button.grid(row=3, column=0, padx=20, pady=(20, 10))
 
     def button_import(self):
         start = self._start_ran
@@ -468,6 +496,10 @@ class App(customtkinter.CTk):
         )
         self.combobox_adj_val.set(value=adjs[0])
         self.combo_val.set(value=sel)
+        n_rhymes = [i["word"] for i in get_rhym(self.sel, "rel_nry")]
+        print(n_rhymes)
+        for i in n_rhymes:
+            self.rhyme_table.insert("", tkinter.END, values=i)
 
     def change_scaling(self, new_scaling: str):
         new_scaling_float = int(new_scaling.replace("%", "")) / 100
