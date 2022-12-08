@@ -193,87 +193,90 @@ def get_rhym(word: str, type: str) -> List[str]:
         yield i["word"]
 
 
-def get_related(word: str) -> List[str]:
+def get_related(word: str, is_fast: bool) -> List[str]:
     flag = False
     final = []
-    try:
-        # print(f"adding1 {j(word)}")
-        final.append(j(word))
-    except Exception:
-        pass
-    try:
-        parsed = _parser.fetch(word)[0]["definitions"][0]["relatedWords"][0]["words"]
-        if (
-            _parser.fetch(word)[0]["definitions"][0]["relatedWords"][0][
-                "relationshipType"
-            ]
-            == "antonyms"
-        ):
-            raise IndexError
-        # print(f"adding2 {parsed}")
-        final.append(parsed)
-    except IndexError:
-        pass
-
-    parsed, exists, adj = _get_syn(word)
-    if len(parsed) == 0:
-        if len((a := j(word))) != 0:
-            # print(f"adding3 {a}")
-            final.append(a)
+    if not is_fast:
+        print(is_fast, "is ghoing")
         try:
-            b = wn.synsets(word)
-        except AttributeError:
-            b = []
-        if len(b) != 0:
-            # print(f"adding4 {[str(lemma.name()) for lemma in b[0].lemmas()]}")
-            final.append([str(lemma.name()) for lemma in b[0].lemmas()])
-    # print(f"adding5 {parsed}")
-    final.append(parsed)
+            # print(f"adding1 {j(word)}")
+            final.append(j(word))
+        except Exception:
+            pass
+        try:
+            parsed = _parser.fetch(word)[0]["definitions"][0]["relatedWords"][0]["words"]
+            if (
+                _parser.fetch(word)[0]["definitions"][0]["relatedWords"][0][
+                    "relationshipType"
+                ]
+                == "antonyms"
+            ):
+                raise IndexError
+            # print(f"adding2 {parsed}")
+            final.append(parsed)
+        except IndexError:
+            pass
 
-    if not flag:
-        for i in parsed:
-            i: str
-            if i.__contains__("Thesaurus:"):
-                adj_word = i[i.index("Thesaurus:") + 10 :]
-                # print(f"adding6 {j(adj_word)=}")
-                final.append(j(adj_word))
-                final.append(get_rhym(adj_word, "ml"))
-                # print(f"adding7 {adj_word=}")
-                final.append(adj_word)
-    else:
-        if exists:
-            # print(f"adding8 {j(adj)=}")
-            final.append(j(adj))
-            # print(f"adding9 {adj=}")
-            final.append(adj)
+        parsed, exists, adj = _get_syn(word)
+        if len(parsed) == 0:
+            if len((a := j(word))) != 0:
+                # print(f"adding3 {a}")
+                final.append(a)
+            try:
+                b = wn.synsets(word)
+            except AttributeError:
+                b = []
+            if len(b) != 0:
+                # print(f"adding4 {[str(lemma.name()) for lemma in b[0].lemmas()]}")
+                final.append([str(lemma.name()) for lemma in b[0].lemmas()])
+        # print(f"adding5 {parsed}")
+        final.append(parsed)
 
-    _flag = False
-    if not flag:
-        if len(parsed) != 0:
-            udef: str
-            _parsed = []
-            for udef in parsed:
-                udef = udef.split(", ")
-                try:
-                    udef[0] = udef[0][(udef[0].index(":") + 2) :]
-                except ValueError:
-                    _flag = True
-                    # print(f"adding10 {parsed}")
-                    final.append(parsed)
-                [_parsed.append(i) for i in udef]
-                # print(f"adding11 {_parsed=}")
+        if not flag:
+            for i in parsed:
+                i: str
+                if i.__contains__("Thesaurus:"):
+                    adj_word = i[i.index("Thesaurus:") + 10 :]
+                    # print(f"adding6 {j(adj_word)=}")
+                    final.append(j(adj_word))
+                    final.append(get_rhym(adj_word, "ml"))
+                    # print(f"adding7 {adj_word=}")
+                    final.append(adj_word)
+        else:
+            if exists:
+                # print(f"adding8 {j(adj)=}")
+                final.append(j(adj))
+                # print(f"adding9 {adj=}")
+                final.append(adj)
+
+        _flag = False
+        if not flag:
+            if len(parsed) != 0:
+                udef: str
+                _parsed = []
+                for udef in parsed:
+                    udef = udef.split(", ")
+                    try:
+                        udef[0] = udef[0][(udef[0].index(":") + 2) :]
+                    except ValueError:
+                        _flag = True
+                        # print(f"adding10 {parsed}")
+                        final.append(parsed)
+                    [_parsed.append(i) for i in udef]
+                    # print(f"adding11 {_parsed=}")
+                    final.append(_parsed)
+
+            if _flag:
+                # print(f"adding12 {_parsed}")
                 final.append(_parsed)
-
-        if _flag:
-            # print(f"adding12 {_parsed}")
-            final.append(_parsed)
 
     final.append(list(get_rhym(word, "ml")))
     final = [_i for _l in final for _i in _l]
-    for i in final:
-        if i[0] == "(":
-            final.remove(i)
-            [final.append(q) for q in re.findall(_PATTERN_PATTERN, i)[0][1].split(", ")]
+    if not is_fast:
+        for i in final:
+            if i[0] == "(":
+                final.remove(i)
+                [final.append(q) for q in re.findall(_PATTERN_PATTERN, i)[0][1].split(", ")]
 
     return list(set(final))
 

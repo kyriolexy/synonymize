@@ -151,6 +151,7 @@ class App(customtkinter.CTk):
         self.revert.grid(row=3, column=2, pady=10, padx=20, sticky="n")
 
         self.combo_val = customtkinter.StringVar(value="synonyms")
+        # todo: add the CTk slider to this
         self.combobox = customtkinter.CTkComboBox(
             master=self.frame_right,
             values=["synonyms"],
@@ -173,10 +174,25 @@ class App(customtkinter.CTk):
         self.tabview.add("Uses")
         self.tabview.add("External")
         self.tabview.add("Poetry")
+        self.tabview.add("Settings")
         self.tabview.tab("Uses").grid_columnconfigure(0, weight=1)
         self.tabview.tab("External").grid_columnconfigure(0, weight=1)
         self.tabview.tab("Poetry").grid_columnconfigure(0, weight=1)
+        self.tabview.tab("Settings").grid_columnconfigure(0, weight=1)
         self.tabview.grid(row=6, column=2, pady=10, padx=20, sticky="n")
+
+        self.fast_mode_var = tkinter.StringVar(value="off")
+        self.fast_mode_switch = customtkinter.CTkSwitch(
+            self.tabview.tab("Settings"),
+            variable=self.fast_mode_var,
+            onvalue="on",
+            offvalue="off",
+            text="Fast mode",
+        )
+        self.fast_mode_switch.grid(row=0, column=0, padx=20, pady=(20, 10))
+        self.fast_mode_hint = Hovertip(
+            self.fast_mode_switch, text="Removes extra api calls", hover_delay=50
+        )
 
         self.optionmenu_var = tkinter.StringVar(value="All")
         self.optionmenu = customtkinter.CTkOptionMenu(
@@ -278,6 +294,8 @@ class App(customtkinter.CTk):
         _processed = ""
         c = 0
         for i in processed.split(" "):
+            if i in string.punctuation or i == "":
+                continue
             punct = i[-1] if i[-1] in string.punctuation else ""
             p_bool = punct == ""
             _processed += (
@@ -352,7 +370,13 @@ class App(customtkinter.CTk):
 
     def save_changes(self):
         processed = self.textbox.get("1.0", tkinter.END).replace("\n", " \n")
-        processed = "".join([i for i in processed if i.isalpha() or i in string.punctuation or i in [" ", "\n"]])
+        processed = "".join(
+            [
+                i
+                for i in processed
+                if i.isalpha() or i in string.punctuation or i in [" ", "\n"]
+            ]
+        )
         _processed = ""
         c = 0
         for i in processed.split(" "):
@@ -376,8 +400,10 @@ class App(customtkinter.CTk):
     def revert_changes(self):
         _history = OrderedDict(reversed(list(self.history.items())))
         text = self.textbox.get("1.0", tkinter.END)
+        print(text)
         for act, rev in _history.items():
             text.replace(act, rev)
+            print(text)
         self.textbox.destroy()
         self.textbox = customtkinter.CTkTextbox(master=self.frame_info)
         self.textbox.grid(
@@ -530,7 +556,9 @@ class App(customtkinter.CTk):
 
         self.sel, self._sel = _sel, _sel
         self.subscr = "".join([i for i in _sel if not i.isalpha()])
-        self.combobox.configure(values=(related := get_related(sel)))
+        self.combobox.configure(
+            values=get_related(sel, is_fast=self.fast_mode_var.get() == "on")
+        )
         self.combobox_adj.configure(
             values=(adjs := list(get_rhym(sel, "rel_jjb")))
             + list(get_rhym(sel, "rel_jja"))
