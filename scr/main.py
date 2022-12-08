@@ -22,6 +22,7 @@ customtkinter.set_default_color_theme(
     "blue"
 )  # Themes: "blue" (standard), "green", "dark-blue"
 
+
 class App(customtkinter.CTk):
     def __init__(self):
         super().__init__()
@@ -189,13 +190,19 @@ class App(customtkinter.CTk):
         self.quotes = customtkinter.CTkTextbox(master=self.tabview.tab("Uses"))
         self.quotes.grid(row=1, column=0, padx=20, pady=(20, 10))
 
-        self.rhyme_table = tkinter.ttk.Treeview(self.tabview.tab("Poetry"), columns=("Word", "Syllables"), show="headings")
+        self.rhyme_table = tkinter.ttk.Treeview(
+            self.tabview.tab("Poetry"), columns=("Word", "Syllables"), show="headings"
+        )
         self.rhyme_table.grid(row=0, column=0, padx=20, pady=(20, 10))
         self.rhyme_table.heading("Word", text="Word")
         self.rhyme_table.heading("Syllables", text="Syllables")
-        self.rhyme_scrollbar = tkinter.ttk.Scrollbar(self.tabview.tab("Poetry"), orient=tkinter.VERTICAL, command=self.rhyme_table.yview)
+        self.rhyme_scrollbar = tkinter.ttk.Scrollbar(
+            self.tabview.tab("Poetry"),
+            orient=tkinter.VERTICAL,
+            command=self.rhyme_table.yview,
+        )
         self.rhyme_table.configure(yscroll=self.rhyme_scrollbar.set)
-        self.rhyme_scrollbar.grid(row=0, column=1, sticky='ns')
+        self.rhyme_scrollbar.grid(row=0, column=1, sticky="ns")
 
         # set default values
         # self.button_import(start=True)
@@ -209,20 +216,34 @@ class App(customtkinter.CTk):
         self.history = OrderedDict()
 
         self.sel, self._sel = "example", "example"
-        self.wiktionary_button = customtkinter.CTkButton(self.tabview.tab("External"),
-                                                         command=lambda: wb.open(f"https://en.wiktionary.org/wiki/{self.sel[:-1]}"), text="Wiktionary")
+        self.wiktionary_button = customtkinter.CTkButton(
+            self.tabview.tab("External"),
+            command=lambda: wb.open(f"https://en.wiktionary.org/wiki/{self.sel[:-1]}"),
+            text="Wiktionary",
+        )
         self.wiktionary_button.grid(row=0, column=0, padx=20, pady=(20, 10))
 
-        self.wiki_button = customtkinter.CTkButton(self.tabview.tab("External"),
-                                                         command=lambda: wb.open(f"https://en.wikipedia.org/wiki/{self.sel[:-1]}"), text="Wikipedia")
+        self.wiki_button = customtkinter.CTkButton(
+            self.tabview.tab("External"),
+            command=lambda: wb.open(f"https://en.wikipedia.org/wiki/{self.sel[:-1]}"),
+            text="Wikipedia",
+        )
         self.wiki_button.grid(row=1, column=0, padx=20, pady=(20, 10))
 
-        self.rhymezone_button = customtkinter.CTkButton(self.tabview.tab("External"),
-                                                         command=lambda: wb.open(f"https://www.rhymezone.com/r/rhyme.cgi?typeofrhyme=wke&loc=defwk&Word={self.sel[:-1]}"), text="Rhymezone Uses")
+        self.rhymezone_button = customtkinter.CTkButton(
+            self.tabview.tab("External"),
+            command=lambda: wb.open(
+                f"https://www.rhymezone.com/r/rhyme.cgi?typeofrhyme=wke&loc=defwk&Word={self.sel[:-1]}"
+            ),
+            text="Rhymezone Uses",
+        )
         self.rhymezone_button.grid(row=2, column=0, padx=20, pady=(20, 10))
 
-        self.onelook_button = customtkinter.CTkButton(self.tabview.tab("External"),
-                                                        command=lambda: wb.open(f"https://www.onelook.com/?w={self.sel[:-1]}&ls=a"), text="OneLook Dictionary")
+        self.onelook_button = customtkinter.CTkButton(
+            self.tabview.tab("External"),
+            command=lambda: wb.open(f"https://www.onelook.com/?w={self.sel[:-1]}&ls=a"),
+            text="OneLook Dictionary",
+        )
         self.onelook_button.grid(row=3, column=0, padx=20, pady=(20, 10))
 
     def button_import(self):
@@ -279,7 +300,19 @@ class App(customtkinter.CTk):
                 filetypes=[("All Files", "*.*"), ("Text Documents", "*.txt")],
             )
             with open(filename, "w") as f:
-                f.write(self.textbox.get("1.0", tkinter.END))
+                f.write(
+                    "".join(
+                        [
+                            i
+                            for i in self.textbox.get("1.0", tkinter.END).translate(
+                                R_SUBSCRIPT
+                            )
+                            if i.isalpha()
+                            or i in string.punctuation
+                            or i in ["\n", " "]
+                        ]
+                    )
+                )
 
     def optionbox_event(self, choice):
         raise NotImplementedError
@@ -313,13 +346,19 @@ class App(customtkinter.CTk):
         self.history[f"{choice} {self._sel}"] = self._sel
         self.recolor()
         del self.combobox_adj_tooltip
-        self.combobox_adj_tooltip = Hovertip(self.combobox_adj, pprint_def(choice), hover_delay=100)
+        self.combobox_adj_tooltip = Hovertip(
+            self.combobox_adj, pprint_def(choice), hover_delay=100
+        )
 
     def save_changes(self):
         processed = self.textbox.get("1.0", tkinter.END).replace("\n", " \n")
+        processed = "".join([i for i in processed if i.isalpha() or i in string.punctuation or i in [" ", "\n"]])
         _processed = ""
         c = 0
         for i in processed.split(" "):
+            if i == "":
+                _processed += " "
+                continue
             punct = i[-1] if i[-1] in string.punctuation else ""
             p_bool = punct == ""
             _processed += (
@@ -407,7 +446,9 @@ class App(customtkinter.CTk):
         self.history[choice] = self._sel
         self.recolor()
         del self.combo_tooltip
-        self.combo_tooltip = Hovertip(self.combobox, pprint_def(choice), hover_delay=100)
+        self.combo_tooltip = Hovertip(
+            self.combobox, pprint_def(choice), hover_delay=100
+        )
         self._sel = choice + self.subscr
 
     def recolor(self):
